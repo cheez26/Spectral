@@ -25,7 +25,6 @@
 
 // gui
 // - utf8 no czech/hungarian/slovak: ČĎĚŇŘŠŤŽ čďěňřšťž Ýý ÔôŐő ŰűŮů Ĺĺ Ľľ Ŕŕ (see tabs: d,k,m,p,r,t)
-// - no selector (pok)
 // - no inputbox
 
 // gallery
@@ -34,21 +33,19 @@
 
 // zxdb
 // - infos get lost between different .sav sessions
-// - overlay: no scroll (mouse/key), no zooming
+// - overlay: no panning (mouse/key), no zooming
 // - JACKNIP.TAP ; difficult to get it right without hyphenation. best we could do for now is search JACKNIP%
 // - instructions: wordwrap, utf8 bom
 // - no mp3s
-// - no ays
-// - maps: battle valley
+// - maps: battle valley, river raid
 
 // embedded zxplayer
 // - cant load zip/rar files because FILE *fp is not pointing at seek pos
 
 // trdos+L mode
 
-// 128/+2:
-// - parapshock should break; it doesnt
-// - parapshock + turborom
+// 128/+2/+2A/+3:
+// - parapshock should break while loading (POKE STREAM #254); it doesnt
 // .ay files:
 // - could use left/right keys to change tracks
 // - could fill vram so it displays author, filename, etc datas. or use ui_notify() at least
@@ -124,7 +121,7 @@ int ZX; // 16, 48, 128, 200 (+2), 210 (+2A), 300 (+3)
 int ZX_AY = 2; // 0: no, 1: fast, 2: accurate
 int ZX_PALETTE = 0; // 0: own, N: others
 int ZX_TURBOROM = 0; // 0: no, 1: patch rom so loading standard tape blocks is faster (see: .tap files)
-int ZX_JOYSTICK = 3; // 0: no, 1: sinclair1, 2: sinclair2, 3: cursor/fuller/kempston/protek, 4..: other mappings
+int ZX_JOYSTICK = 3; // 0: no, 1: sinclair1, 2: sinclair2, 3: cursor/fuller/kempston/protek, 4..: custom mappings
 int ZX_AUTOFIRE = 0; // 0: no, 1: slow, 2: fast
 int ZX_AUTOPLAY = 0; // yes/no: auto-plays tapes based on #FE port reads
 int ZX_AUTOSTOP = 0; // yes/no: auto-stops tapes based on #FE port reads
@@ -153,7 +150,11 @@ int ZX_INPUT = 1;
 int ZX_ALTROMS = 0; // 0:(no, original), 1:(yes, custom)
 
 const char *ZX_FN_STR[] = {"ESC","F1","F2","F3","F4","F5","F6","F7","F8","F9","F10","F11","F12"};
-int ZX_FN[12+1] = {0}; // redefinable function keys. FN[0] = ESC, FN[1..12] = F1..F12
+int ZX_FN[12+1] = {'GAME'}; // redefineable function keys. FN[0] = ESC, FN[1..12] = F1..F12
+
+const char *ZX_PAD_STR[] = {"⭠","⭢","⭡","⭣","\4A\7","\2B\7","\5X\7","\6Y\7","LB","RB","LT","RT","LS","RS","Bk","St"};
+int ZX_PAD[16] = {TK_LEFT,TK_RIGHT,TK_UP,TK_DOWN,TK_TAB};  // redefineable gamepad keys
+int ZX_PAD_[16] = {0}; // temporary values while remapping. array not serialized
 
 #define INI_OPTIONS(X) \
     X(ZX) \
@@ -174,7 +175,10 @@ int ZX_FN[12+1] = {0}; // redefinable function keys. FN[0] = ESC, FN[1..12] = F1
     X(ZX_PALETTE) \
     X(ZX_AUTOFIRE) \
     X(ZX_FN[0]) X(ZX_FN[1]) X(ZX_FN[2]) X(ZX_FN[3]) X(ZX_FN[4]) X(ZX_FN[5]) \
-    X(ZX_FN[6]) X(ZX_FN[7]) X(ZX_FN[8]) X(ZX_FN[9]) X(ZX_FN[10]) X(ZX_FN[11]) X(ZX_FN[12])
+    X(ZX_FN[6]) X(ZX_FN[7]) X(ZX_FN[8]) X(ZX_FN[9]) X(ZX_FN[10]) X(ZX_FN[11]) X(ZX_FN[12]) \
+    X(ZX_PAD[0]) X(ZX_PAD[1]) X(ZX_PAD[2]) X(ZX_PAD[3]) X(ZX_PAD[4]) X(ZX_PAD[5]) \
+    X(ZX_PAD[6]) X(ZX_PAD[7]) X(ZX_PAD[8]) X(ZX_PAD[9]) X(ZX_PAD[10]) X(ZX_PAD[11]) \
+    X(ZX_PAD[12]) X(ZX_PAD[13]) X(ZX_PAD[14]) X(ZX_PAD[15])
 
 void logport(word port, byte value, int is_out);
 void outport(word port, byte value);
@@ -624,9 +628,11 @@ int loadfile(const char *file, int preloader) {
     }
 #endif
 
+#if 0 // disabled at this point bc of AfterTheWar
     if( ZX_AUTOLOCALE ) {
         translate(ptr, size, 'en');
     }
+#endif
 
     int ok = 0;
     const char *ext = strrchr(file, '.');
@@ -1620,12 +1626,12 @@ byte inport_(word port) {
     if( ZX_MOUSE )
     {
         // kempston mouse detection
-        if(port == 0xFADF) kempston_mouse |= 1;
-        if(port == 0xFBDF) kempston_mouse |= 2;
-        if(port == 0xFFDF) kempston_mouse |= 4;
+        if(port == 0xFADF) kempston_mouse |= 1; //button(s)
+        if(port == 0xFBDF) kempston_mouse |= 2; //X
+        if(port == 0xFFDF) kempston_mouse |= 4; //Y
 
         // kempston mouse
-        if( kempston_mouse == 7 ) {
+        if( kempston_mouse == 3 ) { // was: 7 before. arkanoid does not use Y.
             struct mouse m = mouse();
             if(!(port & (0xFFFF^0xFADF))) return mouse_clip(1), mouse_cursor(0), 0xFF&~(1*m.rb+2*m.lb+4*m.mb); // ----.--10.--0-.----  =  Buttons: D0 = RMB, D1 = LMB, D2 = MMB
             if(!(port & (0xFFFF^0xFBDF))) return mouse_clip(1), mouse_cursor(0),  m.x;                         // ----.-011.--0-.----  =  X-axis:  $00 … $FF

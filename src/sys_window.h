@@ -50,6 +50,20 @@ void window_override_icons() {
 
 #elif defined _WIN32
 
+#if 0
+void ApplyDarkModeToControls(HWND hwnd, BOOL darkMode) {
+    HWND hChild = GetWindow(hwnd, GW_CHILD);
+
+    while (hChild) {
+#       pragma comment(lib, "uxtheme")
+        SetWindowTheme(hChild, darkMode ? L"DarkMode_Explorer" : NULL, NULL);
+
+        ApplyDarkModeToControls(hChild, darkMode);
+        hChild = GetWindow(hChild, GW_HWNDNEXT);
+    }
+}
+#endif
+
 // Set the window icon for every window in your app (including MessageBox() calls and assertion failures) instead of just your primary window.
 static HICON appIcon; // = (HICON)GetClassLong(hWnd, GCL_HICON);
 static LRESULT 
@@ -60,7 +74,36 @@ window_create_callback(int type, WPARAM wparam, LPARAM lparam) {
     if (type == HCBT_CREATEWND) {
         SendMessage((HWND)wparam, WM_SETICON, ICON_SMALL, (LPARAM)appIcon);
         SendMessage((HWND)wparam, WM_SETICON, ICON_BIG, (LPARAM)appIcon);
+        
+        // does not work
+        //ApplyDarkModeToControls((HWND)wparam, TRUE);
     }
+
+#if 1 //< @r-lyeh dark mode: titlebar
+    if (type == HCBT_ACTIVATE) {
+        HWND hWnd = (HWND)wparam;
+        {
+            DWORD light_mode = 0;
+            DWORD light_mode_size = sizeof(light_mode);
+
+            LSTATUS result = RegGetValueW(HKEY_CURRENT_USER,
+                L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", L"AppsUseLightTheme",
+                RRF_RT_REG_DWORD, NULL, &light_mode, &light_mode_size);
+
+            if( result == ERROR_SUCCESS ) {
+                // dark titlebar
+                enum DWMNCRENDERINGPOLICY ncrp = DWMNCRP_ENABLED;
+                DwmSetWindowAttribute(hWnd, DWMWA_NCRENDERING_POLICY, &ncrp, sizeof(ncrp));
+                BOOL enabled = light_mode == 0;
+                DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &enabled, sizeof(enabled));
+
+                // dark controls. does not work
+                // if(enabled) ApplyDarkModeToControls(hWnd, TRUE);
+            }
+        }
+    }
+#endif
+
     return CallNextHookEx(NULL, type, wparam, lparam);
 }
 void window_override_icons() {

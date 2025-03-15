@@ -194,7 +194,7 @@ for /F "skip=1 delims=" %%F in ('
     )
 )
 where /q rcedit-x64.exe && rcedit-x64 "Spectral.exe" --set-file-version "!year!.!month!.!today!.!today!!month!"
-where /q rcedit-x64.exe && rcedit-x64 "Spectral.exe" --set-product-version "1.03 Spectral"
+where /q rcedit-x64.exe && rcedit-x64 "Spectral.exe" --set-product-version "1.04 Spectral-WIP"
 where /q rcedit-x64.exe && rcedit-x64 "Spectral.exe" --set-icon src\res\img\noto_1f47b.ico
 rem where /q rcedit-x64.exe && rcedit-x64 "Spectral.exe" --set-version-string "version" "value"
 rem where /q rcedit-x64.exe && rcedit-x64 "Spectral.exe" --set-resource-string "version" "value"

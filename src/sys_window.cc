@@ -9,6 +9,16 @@ extern "C" char* osdialog_prompt(int, const char*, const char*);
 extern "C"
 char* prompt( const char *title, const char *caption, const char *defaults ) {
 
+#if 1 // FULLSCREEN FIX 1/2
+    HWND hwndParent = GetActiveWindow(); // = GetForegroundWindow();
+    bool is_fullscreen = 0;
+    RECT r; is_fullscreen = GetWindowRect(hwndParent, &r) && !r.top && !r.left;
+    if( is_fullscreen ) {
+        // PostMessage(hwndParent, WM_SYSCOMMAND, SC_MINIMIZE, 0);
+        ShowWindow(hwndParent, SW_HIDE);
+    }
+#endif
+
     void *hwndParentWindow = (void*)GetActiveWindow(); // = (void*)GetForegroundWindow();
 
 #if 1
@@ -292,6 +302,13 @@ SetWindowPos(hwndInputBox, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
         DestroyWindow(myinp.hwndInputBox);
     }
+
+#if 2 // FULLSCREEN FIX 2/2
+    if( is_fullscreen ) {
+        // PostMessage(hwndParent, WM_SYSCOMMAND, SC_RESTORE, 0);
+        ShowWindow(hwndParent, SW_SHOW);
+    }
+#endif
 
     return result;
 

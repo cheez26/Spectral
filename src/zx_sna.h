@@ -406,9 +406,7 @@ int pok_load(const byte *src, int len) {
     */
     if( *src != 'N' ) return 0; // not a .pok file
 
-    ui_dialog_new();
-    ui_dialog_option(0,"-Select Cheat-\n",NULL,0,NULL);
-    ui_dialog_separator();
+    ui_dialog_new("-Select Cheat-");
 
     char pokes[256] = {0};
     char trainer[256] = {0};
@@ -434,7 +432,7 @@ int pok_load(const byte *src, int len) {
     }
 
     puts(".pok error");
-    ui_dialog_new();
+    ui_dialog_new(NULL);
     return 0;
 }
 

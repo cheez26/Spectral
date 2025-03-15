@@ -309,6 +309,9 @@ int tigrKeyDown(Tigr *bmp, int key);
 int tigrKeyHeld(Tigr *bmp, int key);
 int tigrKeyUp(Tigr *bmp, int key); //< @r-lyeh
 
+// Reads the whole keyboard status for a window. Array of [256] curr + [256] prev entries
+char *tigrKeys(Tigr *bmp); //< @r-lyeh
+
 // Reads character input for a window.
 // Returns the Unicode value of the last key pressed, or 0 if none.
 int tigrReadChar(Tigr *bmp);
@@ -2320,6 +2323,14 @@ TigrInternal* tigrInternal(Tigr* bmp) {
 #include <stdlib.h>
 #include <stddef.h>
 
+#if 1 //< @r-lyeh for dark mode
+#include <dwmapi.h>
+#pragma comment (lib, "dwmapi")
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+#endif
+
 #pragma comment(lib, "opengl32")  // glViewport
 #pragma comment(lib, "shell32")   // CommandLineToArgvW
 #pragma comment(lib, "user32")    // SetWindowLong
@@ -2769,6 +2780,24 @@ Tigr* tigrWindow(int w, int h, const char* title, int flags) {
     if (!hWnd)
         ExitProcess(1);
 
+#if 1 //< @r-lyeh dark mode
+    {
+        DWORD light_mode = 0;
+        DWORD light_mode_size = sizeof(light_mode);
+
+        LSTATUS result = RegGetValueW(HKEY_CURRENT_USER,
+            L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", L"AppsUseLightTheme",
+            RRF_RT_REG_DWORD, NULL, &light_mode, &light_mode_size);
+
+        if( result == ERROR_SUCCESS ) {
+            enum DWMNCRENDERINGPOLICY ncrp = DWMNCRP_ENABLED;
+            DwmSetWindowAttribute(hWnd, DWMWA_NCRENDERING_POLICY, &ncrp, sizeof(ncrp));
+            BOOL enabled = light_mode == 0;
+            DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &enabled, sizeof(enabled));
+        }
+    }
+#endif
+
     if (flags & TIGR_NOCURSOR) {
         ShowCursor(FALSE);
     }
@@ -3051,6 +3080,30 @@ static int tigrWinVK(int key) {
             return VK_SNAPSHOT; //< @r-lyeh
     }
     return 0;
+}
+
+char* tigrKeys(Tigr* bmp) { //< @r-lyeh
+    TigrInternal* win = tigrInternal(bmp);
+    static char keys[512];
+    memset(keys, 0, sizeof(keys));
+    if (GetFocus() == bmp->handle) {
+        static int remap1[256] = {0}, remap2[256] = {0}, *init = NULL;
+        if(!init) {
+            init = remap1;
+            for( int i = 0; i < TK_PRINT; ++i ) {
+                int vk = tigrWinVK(i);
+                assert(i < 256);
+                assert(vk < 256);
+                remap1[i] = vk;
+                remap2[vk] = i;
+            }
+        }
+        for( int i = 0; i < 256; ++i ) {
+            keys[i + 000] = win->keys[remap1[i]];
+            keys[i + 256] = win->prev[remap1[i]];
+        }
+    }
+    return keys;
 }
 
 int tigrKeyDown(Tigr* bmp, int key) {
@@ -4209,6 +4262,12 @@ int tigrTouch(Tigr* bmp, TigrTouchPoint* points, int maxPoints) {
     return buttons ? 1 : 0;
 }
 
+char* tigrKeys(Tigr* bmp) { //< @r-lyeh
+    TigrInternal* win = tigrInternal(bmp);
+    static char keys[512];
+    return memcpy(keys, win->keys, 256), memcpy(keys+256, win->prev, 256), keys;
+}
+
 int tigrKeyDown(Tigr* bmp, int key) {
     TigrInternal* win;
     assert(key < 256);
@@ -4749,6 +4808,12 @@ int tigrGAPIEnd(Tigr* bmp) {
     return 0;
 }
 
+char* tigrKeys(Tigr* bmp) { //< @r-lyeh
+    TigrInternal* win = tigrInternal(bmp);
+    static char keys[512];
+    return memcpy(keys, win->keys, 256), memcpy(keys+256, win->prev, 256), keys;
+}
+
 int tigrKeyDown(Tigr* bmp, int key) {
     TigrInternal* win;
     assert(key < 256);
@@ -5116,6 +5181,12 @@ int tigrGAPIBegin(Tigr* bmp) {
 int tigrGAPIEnd(Tigr* bmp) {
     (void)bmp;
     return glXMakeCurrent(NULL, 0, 0) ? 0 : -1;
+}
+
+char* tigrKeys(Tigr* bmp) { //< @r-lyeh
+    TigrInternal* win = tigrInternal(bmp);
+    static char keys[512];
+    return memcpy(keys, win->keys, 256), memcpy(keys+256, win->prev, 256), keys;
 }
 
 int tigrKeyDown(Tigr* bmp, int key) {
@@ -6130,6 +6201,12 @@ int tigrGAPIEnd(Tigr* bmp) {
     (void)bmp;
     eglMakeCurrent(gState.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     return 0;
+}
+
+char* tigrKeys(Tigr* bmp) { //< @r-lyeh
+    TigrInternal* win = tigrInternal(bmp);
+    static char keys[512];
+    return memcpy(keys, win->keys, 256), memcpy(keys+256, win->prev, 256), keys;
 }
 
 int tigrKeyDown(Tigr* bmp, int key) {

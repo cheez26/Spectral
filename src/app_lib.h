@@ -641,18 +641,16 @@ char* game_browser_v2() {
     ui_at(ui, 11-4-2, UPPER_SPACING);
 
 //  static const char *tab = 0;
-    static const char *tabs = "\x15\x17#ABCDEFGHIJKLMNOPQRSTUVWXYZ\x12\x18";
+    static const char *tabs = "\x17#ABCDEFGHIJKLMNOPQRSTUVWXYZ\x12\x18"; // "⧖"
 
-    do_once tab = tabs+3; // 'A'
+    do_once tab = tabs+2; // 'A'
 
     for(int i = 0; tabs[i]; ++i) {
-        if( (ui_at(ui, ui_x+4+8*(i==1), ui_y), ui_button(NULL, va("%c%c", (tab && tabs[i] == *tab) ? 5 : 7, tabs[i])) )) {
+        if( (ui_at(ui, ui_x+4+20*(i==0), ui_y), ui_button(NULL, va("%c%c", (tab && tabs[i] == *tab) ? 5 : 7, tabs[i])) )) {
             if( ui_hover ) {
-                /**/ if(tabs[i] == '\x15') ui_notify( "-Resume-" );
-                else if(tabs[i] == '\x17') ui_notify( "-Browse local folder-\nClick again to change folder" );
+                /**/ if(tabs[i] == '\x17') ui_notify( "-Browse local folder-\nClick again to change folder" );
                 else if(tabs[i] == '\x12') ui_notify( "-List Bookmarks-\nClick again to change thumbnails view" );
                 else if(tabs[i] == '\x18') ui_notify( "-Search game-" );
-//              else if(tabs[i] == '\x19') ui_notify( "-Toggle thumbnails-" );
                 else if(tabs[i] ==    '#') ui_notify( "-List other games-\nClick again to change thumbnails view" );
                 else                       ui_notify( va("-List %c games-\nClick again to change thumbnails view", tabs[i]) );
             }
@@ -676,30 +674,23 @@ char* game_browser_v2() {
     if( left )  if(!tab) tab = tabs; else if(*tab-- == '#') tab = tabs + 29;
     if( right ) if(!tab) tab = tabs; else if(*tab++ == 'Z') tab = tabs +  3;
 #else
+    enum { _2 = 1, _29 = 28 };
     if(!tab) tab = tabs;
-    if( tab >= (tabs+2) && tab <= (tabs+29) ) {
-    if( left  ) if(*tab-- ==    '#') tab = tabs + 29;
-    if( right ) if(*tab++ == '\x12') tab = tabs +  2;
+    if( tab >= (tabs+_2) && tab <= (tabs+_29) ) {
+    if( left  ) if(*tab-- ==    '#') tab = tabs + _29;
+    if( right ) if(*tab++ == '\x12') tab = tabs +  _2;
     } else {
-    if( tab < (tabs+ 2) ) tab = left ? tabs + 29 : right ? tabs + 2 : tab;
-    if( tab > (tabs+29) ) tab = left ? tabs + 29 : right ? tabs + 2 : tab;
+    if( tab < (tabs+ _2) ) tab = left ? tabs + _29 : right ? tabs + _2 : tab;
+    if( tab > (tabs+_29) ) tab = left ? tabs + _29 : right ? tabs + _2 : tab;
     }
 #endif
 
     static const char *prev = 0;
     if( tab && prev != tab ) {
 
-        if( *tab == '\x15' ) {
-            tab = 0;
-            //active = 0;
-            return NULL;
-        }
-        else
         if( *tab == '\x18' ) {
-            tab = 0;
-            prev = 0;
 
-            const char *search = prompt("Game search", "Either \"#zxdb-id\", \"*text*search*\", or \"/file.ext\" path", "");
+            const char *search = prompt("Game search", ""/*"Either \"#zxdb-id\", \"*text*search*\", or \"/file.ext\" path"*/, "");
             if( search && search[0] ) {
                 int found = 0;
 
@@ -720,6 +711,9 @@ char* game_browser_v2() {
                 }
 
                 if( found ) {
+                    tab = 0;
+                    prev = 0;
+
                     active = 0;
                     //list = 0;
                     //list_num = 0;
@@ -728,6 +722,9 @@ char* game_browser_v2() {
 
                 alert("Not found");
             }
+
+            // something went wrong. return to previous tab
+            tab = prev;
         }
         else
         if( *tab == '\x17' ) {

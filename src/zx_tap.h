@@ -183,11 +183,12 @@ struct tape_block mic_read_tapeblock(int voc_pos) {
             IF_TURBOROM_TURBO(q.units /= ROMHACK_TURBO);  // ROMHACK $5a5 turbo loader (OK)
         }
         else if( q.debug == 'u' ) { // pa(u)se
-            //commented because of spirits.tzx
-            #if 0 // removed on v06/v07
+            #if 0 // removed on v06/v07 because of spirits.tzx
             IF_TURBOROM_FASTER_EDGES(q.units -= 358);          // ROMHACK $5e7 x16 faster edges (OK)
             #endif
+            #if 0 // removed on v104 because of Afterburner.tzx and many TopoSoft games
             IF_TURBOROM_FASTER_PILOTS_AND_PAUSES(q.units /= 6); // ROMHACK $571 x6 faster pilots/pauses (OK)
+            #endif
         }
     }
 

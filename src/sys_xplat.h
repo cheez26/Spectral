@@ -82,3 +82,19 @@ typedef int RECT;
 #define ifndef_win32(t,...)  t
 #define ifdef_win32(t,...) __VA_ARGS__
 #endif
+
+#ifdef __linux__
+#define ifdef_linux(t,...)  t
+#define ifndef_linux(t,...) __VA_ARGS__
+#else
+#define ifndef_linux(t,...)  t
+#define ifdef_linux(t,...) __VA_ARGS__
+#endif
+
+#ifdef __APPLE__
+#define ifdef_osx(t,...)  t
+#define ifndef_osx(t,...) __VA_ARGS__
+#else
+#define ifndef_osx(t,...)  t
+#define ifdef_osx(t,...) __VA_ARGS__
+#endif

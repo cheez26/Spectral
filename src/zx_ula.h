@@ -798,6 +798,11 @@ const char *shader =
     "    /* mix up */\n"
     "    fragColor.rgb = color * edge.x * edge.y;\n"
 
+//    " // ultrawide ula\n"
+//    "if(uv.x<0.1) fragColor.rgb = vec3(1,0,1);\n"
+//    "else if(uv.x>0.9) fragColor.rgb = vec3(1,0,0);\n"
+
+
 #if 0
     "    /* diodes */\n"
     "    if(mod(fragCoord.y, 2.)<1.) fragColor.rgb*=.95;\n"

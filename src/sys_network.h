@@ -87,3 +87,9 @@ int download_file( FILE *out, const char *url ) {
 }
 
 #endif
+
+
+void visit(const char *url) {
+    FILE *f = _popen(va("%s %s", ifdef(win32, "start", ifdef(linux, "xdg-open", "open")), url), "rb");
+    if( f ) _pclose(f);
+}

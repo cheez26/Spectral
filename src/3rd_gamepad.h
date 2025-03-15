@@ -65,6 +65,10 @@ enum GAMEPAD_BUTTON {
 	BUTTON_X				= 15,	/**< X button */
 	BUTTON_Y				= 16,	/**< Y button */
 
+#if 0 // @r-lyeh
+	BUTTON_GUIDE = 0x400+1,
+#endif
+
 	BUTTON_COUNT					/**< Maximum number of supported buttons */
 };
 

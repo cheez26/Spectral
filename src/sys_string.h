@@ -5,8 +5,8 @@
 #include <stdarg.h>
 #include <string.h>
 char* va(const char *fmt, ...) {
-    static char buf[64][1024+512];
-    static int l = 0; l = (l+1) % 64;
+    static char buf[144][1024+512];
+    static int l = 0; l = (l+1) % 144;
     va_list vl;
     va_start(vl,fmt);
     int rc = vsnprintf(buf[l], 1024+512-1, fmt, vl);
@@ -92,6 +92,12 @@ unsigned crc32(unsigned h, const void *ptr_, unsigned len) {
         0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c, 0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c };
     for(h = ~h; len--; ) { uint8_t b = *ptr++; h = (h >> 4) ^ tbl[(h & 15) ^ (b & 15)]; h = (h >> 4) ^ tbl[(h & 15) ^ (b >> 4)]; }
     return ~h;
+}
+
+unsigned strcnt(const char *text, char ch) {
+    unsigned count = 0;
+    while(*text++) count += text[-1] == ch;
+    return count;
 }
 
 #ifdef _WIN32 // better than strtok(). preserves empty strings within delimiters

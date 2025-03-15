@@ -22,7 +22,7 @@ unsigned gamepad_update(GAMEPAD_DEVICE dev, float rumbleA, float rumbleB) {
     unsigned B = !!GamepadButtonDown(dev, BUTTON_B);
     unsigned X = !!GamepadButtonDown(dev, BUTTON_X);
     unsigned Y = !!GamepadButtonDown(dev, BUTTON_Y);
-#if 0
+
     unsigned Bk= !!GamepadButtonDown(dev, BUTTON_BACK);
     unsigned St= !!GamepadButtonDown(dev, BUTTON_START);
 
@@ -31,16 +31,32 @@ unsigned gamepad_update(GAMEPAD_DEVICE dev, float rumbleA, float rumbleB) {
     unsigned LS = !!GamepadButtonDown(dev, BUTTON_LEFT_THUMB);
     unsigned RS = !!GamepadButtonDown(dev, BUTTON_RIGHT_THUMB);
 
+    float deadzone = 0.15f, deadzone2 = deadzone*deadzone;
+
+    float    LT_= GamepadTriggerLength(dev, TRIGGER_LEFT); 
+    unsigned LT = LT_*LT_ >= deadzone2;
+    float    RT_= GamepadTriggerLength(dev, TRIGGER_RIGHT);
+    unsigned RT = RT_*RT_ >= deadzone2;
+
     float lx, ly, rx, ry;
     GamepadStickNormXY(dev, STICK_LEFT, &lx, &ly);
     GamepadStickNormXY(dev, STICK_RIGHT, &rx, &ry);
+
+    if( (lx*lx) > deadzone2 ) 
+        if( lx < 0 ) L = 1;
+        else
+        if( lx > 0 ) R = 1;
+
+    if( (ly*ly) > deadzone2 ) 
+        if( ly < 0 ) D = 1;
+        else
+        if( ly > 0 ) U = 1;
+
+#if 0
         GamepadStickAngle(dev, STICK_LEFT);
         GamepadStickLength(dev, STICK_LEFT);
         GamepadStickAngle(dev, STICK_RIGHT);
         GamepadStickLength(dev, STICK_RIGHT);
-
-    float LT = GamepadTriggerLength(dev, TRIGGER_LEFT);
-    float RT = GamepadTriggerLength(dev, TRIGGER_RIGHT));
 
                 for (j = 0; j != BUTTON_COUNT; ++j) {
                     if (GamepadButtonTriggered(i, j)) {
@@ -65,8 +81,11 @@ unsigned gamepad_update(GAMEPAD_DEVICE dev, float rumbleA, float rumbleB) {
                 }
 #endif
 
-    unsigned F = A || B || X || Y;
-    return F<<4|R<<3|L<<2|D<<1|U<<0;
+    return 0
+        | St<<15|Bk<<14|RS<<13|LS<<12  // 4 extra buttons (thumbs+menus)
+        | RT<<11|LT<<10|RB<< 9|LB<< 8  // 4 extra buttons (shoulders)
+        |  Y<< 7| X<< 6| B<< 5| A<< 4  // 4 buttons
+        |  D<< 3| U<< 2| R<< 1| L<< 0; // d-pad
 }
 
 unsigned gamepad() {

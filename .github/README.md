@@ -2,15 +2,22 @@
 Sinclair ZX Spectrum emulator from the 80s.
 
 ![image](https://github.com/r-lyeh/Spectral/assets/35402248/8d8ee594-fafd-4538-993f-9840bf9fc245)
-![image](https://github.com/r-lyeh/Spectral/assets/35402248/c1257c88-56c0-4325-926a-b0cbf8b19ae5)
-![image](https://github.com/r-lyeh/Spectral/assets/35402248/99bc9b7a-aa8e-421b-bd8b-8556a4d0dfcb)
+![image](https://github.com/user-attachments/assets/404fce44-9018-4a37-a100-399d6e11dd74)
+![image](https://github.com/user-attachments/assets/fcc20345-c619-48df-af26-e37c8af99a6c)
 
 ## About
-Spectral is an experimental emulator that I have been randomly assembling [since the pandemic days](https://twitter.com/r_rlyeh/status/1280964279903158273), inspired by my old fZX32 emulator. Accuracy and performance are long-term goals, but the primary focus is just having fun with this thing. Hardcore ZX users will find little value in this emulator right now, but I hope newbies may find its ease of use somehow appealing to try.
+Spectral is an experimental emulator that has been randomly assembled [since the pandemic days](https://twitter.com/r_rlyeh/status/1280964279903158273). Accuracy and performance are long-term goals, but the primary focus is just having fun with this thing. Hardcore ZX users will find little value in this emulator right now, but I hope newbies may find its ease of use somehow appealing to try.
 That being said, Spectral has a very compatible TAP/TZX loader and some other interesting features that provide me some fun in these days.
 Code is highly experimental and prone to change in the future. I will keep altering/breaking things randomly for good sake.
 
-## Features and wishlist
+## Roadmap and features
+- [ ] Extra accurate Z80 backend. <!-- @todo: contended mem, contended ports, memptr, snow, Q, floating bus (+2a/+3) -->
+- [ ] Cycle accurate (border, multicolor, etc).
+- [ ] RZX support. <!-- @todo: rzx loadsave http://ramsoft.bbk.org.omegahg.com/rzxform.html -->
+- [ ] MP3s.
+- [ ] Netplay.
+- [ ] Optimized.
+- [x] Unlicensed.
 - [x] Single executable.
 - [x] Z80. Z80 Disassembler.
 - [x] 16, 48, 128, +2, +2A, +3, Pentagon128 models.
@@ -40,19 +47,11 @@ Code is highly experimental and prone to change in the future. I will keep alter
 - [x] ZXDB Browser. ZXDB Gallery. <!-- @todo: 3d tape cases. -->
 - [x] Can translate game menus from some languages into English.
 - [x] Games can be appended to executable and get a standalone game viewer.
-- [ ] Extra accurate Z80 backend. <!-- @todo: contended mem, contended ports, memptr, snow, Q, floating bus (+2a/+3) -->
-- [ ] Cycle accurate (border, multicolor, etc).
-- [ ] RZX support. <!-- @todo: rzx loadsave http://ramsoft.bbk.org.omegahg.com/rzxform.html -->
-- [ ] MP3s.
-- [ ] Netplay.
-- [ ] Optimized.
-- [x] Unlicensed.
 
 ## Downloads
 Download any binary release from [Releases section](https://github.com/r-lyeh/Spectral/releases).
 
 Alternatively, you can build the emulator yourself:
-- `git clone https://github.com/r-lyeh/Spectral`
 - Windows users double click `MAKE.bat` file.
 - Linux/MacOS users can run `sh MAKE.bat` instead.
 
@@ -74,7 +73,7 @@ This software is released into the [public domain](https://unlicense.org/). Also
 
 ## Links
 - [Introduction to the ZX Spectrum](https://en.wikipedia.org/wiki/ZX_Spectrum), entry on Wikipedia.
-- [SpecEmu](https://specemu.zxe.io/), my favourite ZX emulator on Windows.
+- [SpecEmu](https://specemu.zxe.io/), my favourite ZX emulator on Windows. Also, see [other alternatives](https://alternativeto.net/software/spectral/).
 - [SpectrumComputing](https://spectrumcomputing.co.uk/), [WorldOfSpectrum](https://worldofspectrum.net/), [ZXArt](https://zxart.ee/), [Virtual TRDOS](https://vtrd.in/) and [ZXInfo](https://zxinfo.dk/) are the best online resources (imho).
 - [Crash](https://archive.org/details/crash-magazine), [YourSinclair](https://archive.org/details/your-sinclair-magazine), [SinclairUser](https://archive.org/details/sinclair-user-magazine) and [MicroHobby(ES)](https://archive.org/details/microhobby-magazine) are great old paper magazines.
 - [ZXDB](https://github.com/zxdb/ZXDB), [game maps](https://maps.speccy.cz/), [game cheats](https://www.the-tipshop.co.uk/), [RZX](https://worldofspectrum.net/RZXformat.html)[replays](https://www.rzxarchive.co.uk/) and [game longplays](https://www.youtube.com/@rzxarchive).

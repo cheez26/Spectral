@@ -4952,12 +4952,6 @@ static void initX11Stuff() {
                                     GLX_WINDOW_BIT,
                                     GLX_DOUBLEBUFFER,
                                     1,
-                                    GLX_RED_SIZE,
-                                    1,
-                                    GLX_GREEN_SIZE,
-                                    1,
-                                    GLX_BLUE_SIZE,
-                                    1,
                                     None };
 
         int fbcCount = 0;

@@ -64,13 +64,13 @@ int record_start(const char *outfile_mp4, int w, int h, int fps) {
             // -c:v libx264 (https://www.ffmpeg.org/ffmpeg.html#Main-options) Select an encoder (when used before an output file) or a decoder (when used before an input file) for one or more streams. codec is the name of a decoder/encoder or a special value copy (output only) to indicate that the stream is not to be re-encoded.
 
             // open pipe to ffmpeg's stdin in binary write mode
-            rec_ffmpeg = ifdef(win32, _popen(cmd, "wb"), popen(cmd, "w"));
+            rec_ffmpeg = ifdef(win32, popen8(cmd, "wb"), popen(cmd, "w"));
         }
     }
 
     // fallback: built-in mpeg1 encoder
     if( !rec_ffmpeg ) {
-        rec_mpeg1 = fopen(outfile_mp4, "wb"); // "a+b"
+        rec_mpeg1 = fopen8(outfile_mp4, "wb"); // "a+b"
     }
 
     return rec_ffmpeg ? 2 : rec_mpeg1 ? 1 : 0;

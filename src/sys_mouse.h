@@ -1,6 +1,7 @@
 // mouse
 struct mouse {
     int x, y, lb, mb, rb, buttons, cursor; // buttons: R2M1L0 bits
+    float wheel;
 };
 struct mouse mouse() {
     extern Tigr *app;
@@ -38,7 +39,7 @@ struct mouse mouse() {
     }
 #endif
 
-    return ( (struct mouse) {mx, my, lmb, mmb, rmb, mb, tigrGetMouseCursor(app) } );
+    return ( (struct mouse) {mx, my, lmb, mmb, rmb, mb, tigrGetMouseCursor(app), tigrMouseWheel(app) } );
 }
 void mouse_cursor(int mode) { // 0(hide),1(arrow),2(hand),3(ibeam),4(cross)
     extern window *app;

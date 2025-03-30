@@ -14,6 +14,7 @@
 #include "3rd_tigrdragndrop.h"
 #include "3rd_tigrtitle.h"
 #include "3rd_tigroskeys.h"
+#include "3rd_tigrrendermap.h"
 #undef border
 #undef run
 

@@ -390,7 +390,7 @@ char *zxdb_screen_async(const char *id, int *len, int factor) {
 
 
 
-int active; // @todo: rename to browser_active, or library_active
+int active; // @todo: rename to browsing, browser_active, or library_active
 
 extern Tigr *app, *ui;
 extern char *last_load;
@@ -475,11 +475,144 @@ void draw_compatibility_stats(window *layer) {
     }
 }
 
+
+char wildcard[256];
+int  *queries; int numqueries;
+VAL **remotes; int numremotes;
+void search_query_v1(const char *query) {
+    wildcard[0] = 0;
+
+    numqueries = 0;
+    queries = REALLOC((void*)queries, (query && query[0]) * sizeof(int) * 65536);
+    if( !queries ) return;
+
+    if( strchr(query, '*') )
+    snprintf(wildcard, 256-1, "%s", query);
+    else
+    snprintf(wildcard, 256-1, "*%s*", query);
+
+    // search local files for matches
+    for( int i = 0; i < numgames; ++i ) {
+        if( strmatchi(games[i],wildcard) ) queries[numqueries++] = i;
+    }
+
+    // search online files for matches
+#if 1
+        // search & sort
+        free(remotes), remotes = 0;
+        remotes = map_multifind(&zxdb2, wildcard, &numremotes);
+        if( numremotes ) qsort(remotes, numremotes, sizeof(VAL*), zxdb_compare_by_name);
+
+        // remove dupes (like aliases)
+        for( int i = 1; i < numremotes; ++i ) {
+            if( *(char**)remotes[i-1] == *(char**)remotes[i] ) {
+                memmove(remotes + i - 1, remotes + i, ( numremotes - i ) * sizeof(remotes[0]));
+                --numremotes;
+            }
+        }
+
+        // exclude XXX games
+        // exclude For(S)ale,(N)everReleased,Dupes(*),MIA(?) [include (A)vailable,(R)ecovered,(D)enied games]
+        // exclude demos 72..78
+        for( int i = 0; i < numremotes; ++i ) {
+            char *zx_id = (char*)*remotes[i];
+            char *years = strchr(zx_id, '|')+1; int zx_id_len = years-zx_id-1;
+            char *title = strchr(years, '|')+1; int years_len = title-years-1;
+            char *alias = strchr(title, '|')+1; int title_len = alias-title-1;
+            char *brand = strchr(alias, '|')+1; int alias_len = brand-alias-1;
+            char *avail = strchr(brand, '|')+1; int brand_len = avail-brand-1;
+            char *score = strchr(avail, '|')+1; int avail_len = score-avail-1;
+            char *genre = strchr(score, '|')+1; int score_len = genre-score-1;
+            char *tags_ = strchr(genre, '|')+1; int genre_len = tags_-genre-1;
+
+            if( avail[1] == 'X' || !strchr("ARD", avail[0]) || atoi(genre) >= 72 ) {
+                memmove(remotes + i, remotes + i + 1, ( numremotes - i - 1 ) * sizeof(remotes[0]));
+                --numremotes;
+                --i;
+            }
+        }
+#endif
+}
+char *search_results_v1() {
+    if( !queries ) return NULL;
+
+    extern int cmdkey;
+    extern const char *cmdarg;
+
+    ui_at(ui, 8*1, 11*2);
+
+    for( int j = 0; j < numqueries; ++j ) {
+        int i = queries[j];
+
+        const char *sep = strrchr(games[i], *DIR_SEP_);
+        int is_dir = sep[1] == '\0', is_file = !is_dir;
+        if( is_dir ) continue;
+
+        // @fixme: scan folder
+        if( ui_click("Browse to folder", "\6" FOLDER_STR "\f\f") ) cmdkey = 'SCAN', cmdarg = va("%.*s",(int)(sep - games[i]), games[i]); // @todo: browse to containing folder
+        if( ui_click(games[i], sep+1) ) return games[i];
+        if( ui_click(NULL, "\n") );
+    }
+
+    for( int j = 0; j < numremotes; ++j ) {
+        int i = j;
+
+        char *zx_id = (char*)*remotes[i];
+        char *years = strchr(zx_id, '|')+1; int zx_id_len = years-zx_id-1;
+        char *title = strchr(years, '|')+1; int years_len = title-years-1;
+        char *alias = strchr(title, '|')+1; int title_len = alias-title-1;
+        char *brand = strchr(alias, '|')+1; int alias_len = brand-alias-1;
+        char *avail = strchr(brand, '|')+1; int brand_len = avail-brand-1;
+        char *score = strchr(avail, '|')+1; int avail_len = score-avail-1;
+        char *genre = strchr(score, '|')+1; int score_len = genre-score-1;
+        char *tags_ = strchr(genre, '|')+1; int genre_len = tags_-genre-1;
+
+        // should we look into alias or main title
+        char *main = va("%.*s", alias_len ? title_len : alias_len, alias_len ? title : alias);
+        char *alt  = va("%.*s", alias_len ? alias_len : title_len, alias_len ? alias : title);
+        int use_alt = !strmatchi(main, wildcard) && strmatchi(alt, wildcard);
+        if(!use_alt) use_alt = i && atoi((char*)*remotes[i]) == atoi((char*)*remotes[i-1]);
+        if( use_alt ) {
+            char *swap = main;
+            main = alt;
+            alt = swap;
+        }
+
+        // replace year if title was never released
+        if( years[0] == '9' ) years = "?", years_len = 1; // "9999"
+
+        // replace brand if no brand is given. use 1st author if possible
+        if( brand[0] == '|' ) {
+            char *next = strchr(zx_id, '\n');
+            if( next && next[1] == '@' ) { // x3 skips: '\n' + '@' + 'R'ole
+                brand = next+1+1+1, brand_len = strcspn(brand, "@\r\n");
+            }
+        }
+
+        // build full title and clean it up
+        char full[64];
+        snprintf(full, sizeof(full), " %s (%.*s)(%.*s)", main, years_len, years, brand_len, brand);
+        for( int i = 1; full[i]; ++i )
+            if( i == 1 || full[i-1] == '.' )
+                full[i] = toupper(full[i]);
+
+        char url[128];
+        snprintf(url, 128-1, "Open link\nhttps://spectrumcomputing.co.uk/entry/%.*s", zx_id_len, zx_id);
+
+        if( ui_click(url, "\x19\f\f") ) cmdkey = 'LINK', cmdarg = va("%s", url + countof("Open link\n"));
+        if( ui_click(alt, full+1) ) active = 0, cmdkey = 'ZXDB', cmdarg = va("#%.*s", zx_id_len, zx_id);
+        if( ui_click(NULL, "\n") ); ui_y--;
+    }
+
+    return NULL;
+}
+
+
 char *filter; // current text filter in use. can be NULL
 int game_filter() { // returns true if any key was pressed
     enum { _16 = 32, _15 = _16 - 1 };
     static int chars[_16] = {0};
-    static char utf8[5+_16*6+1] = "Find:";
+    static char utf8[5+_16*6+1] = "Hint:";
     filter = utf8 + 5;
 
         int chars_count = 0;
@@ -514,7 +647,7 @@ int game_filter() { // returns true if any key was pressed
 
     // display
 
-    int visible = num_options == 1 && (options[0].flags & 2) && options[0].text[0] == 'F';
+    int visible = num_options == 1 && (options[0].flags & 2) && options[0].text[0] == 'H';
 
     if( done ) {
         memset(chars, 0, sizeof(int)*_16);
@@ -561,7 +694,15 @@ int game_browser_keyboard(const int ENTRIES, const int numgames) { // returns cl
     int home = window_pressed(app, TK_HOME) || (window_pressed(app, TK_UP) && tigrKeyHeld(app, TK_CONTROL));
     int end  = window_pressed(app, TK_END) || (window_pressed(app, TK_DOWN) && tigrKeyHeld(app, TK_CONTROL));
 
-    scroll += tigrMouseWheel(app);
+    float wheel = ifdef(osx, +, -) tigrMouseWheel(app);
+    if( wheel ) {
+        if( window_pressed(app, TK_CONTROL) ) {
+            pg = wheel > 0 ? 1 : -1;
+        }
+        else {
+            scroll += wheel;
+        }
+    }
 
     scroll = CLAMP(scroll, 0, numgames-1);
     selected = CLAMP(selected, 0, numgames-1);
@@ -648,6 +789,12 @@ char* game_browser_v1() {
 
         sprintf(buffer, "%3d.%s", i+1, i == selected ? ">":" ");
         ui_label(buffer);
+
+#if 0
+        ui_y--;
+        if( is_file && ui_click("-Played-", ZXFlashFlag ? "":"▏▏\b\b\b\b" ) );
+        ui_y++;
+#endif
 
         if( is_file && ui_click("-Toggle bookmark-", va("%c\f", "\x10\x12"[!!stars])) )
             starred = 1;
@@ -740,7 +887,7 @@ char* game_browser_v2() {
             if( ui_hover ) {
                 /**/ if(tabs[i] == '\x17') ui_notify( "-Browse local folder-\nClick again to change folder" );
                 else if(tabs[i] == '\x12') ui_notify( "-List Bookmarks-\nClick again to change thumbnails view" );
-                else if(tabs[i] == '\x18') ui_notify( "-Search game-" );
+                else if(tabs[i] == '\x18') ui_notify( "-Search-" );
                 else if(tabs[i] ==    '#') ui_notify( "-List other games-\nClick again to change thumbnails view" );
                 else                       ui_notify( va("-List %c games-\nClick again to change thumbnails view", tabs[i]) );
             }
@@ -752,7 +899,12 @@ char* game_browser_v2() {
                         extern const char *cmdarg;
                         cmdkey = 'SCAN';
                         cmdarg = 0; // ZX_FOLDER;
-                    } else {
+                    }
+                    else if( *tab == '\x18' ) {
+                        const char *search = prompt("Game search", ""/*"Either \"#zxdb-id\", \"*text*search*\", or \"/file.ext\" path"*/, "");
+                        search_query_v1( search );
+                    }
+                    else {
                         int next[] = { [0]=3,[3]=6,[6]=12,[12]=0 };
                         thumbnails = next[thumbnails];
                     }
@@ -778,43 +930,6 @@ char* game_browser_v2() {
 
         selected = scroll = 0; // reset keyboard scroller
 
-        if( *tab == '\x18' ) {
-            int found = 0;
-
-            const char *search = prompt("Game search", ""/*"Either \"#zxdb-id\", \"*text*search*\", or \"/file.ext\" path"*/, "");
-
-            if( search && search[0] ) {
-                if( !found && zxdb_load(search, 0) ) {
-                    found = 1;
-                }
-
-                // most plain numbers like `1143` are likely zxdb-ids (except 1942 and 1943 probably).
-                // so we silently convert 1143 to `#1143` instead to force a zxdb-id search
-                if( !found && !strcmp(search, va("%d", atoi(search))) && zxdb_load(va("#%s", search), 0) ) {
-                    found = 1;
-                }
-
-                // try a partial match "*search*" as well. 
-                // reasoning for this: "jack" will fail, but "*jack*" will deliver jack the ripper or jack the nipper at least
-                if( !found && zxdb_load(va("*%s*",search), 0) ) {
-                    found = 1;
-                }
-            }
-
-            // undo to previous tab
-            tab = prev;
-            if(!tab) tab = tabs + 2; // 'A'
-
-            if( found ) {
-                active = 0;
-                //list = 0;
-                //list_num = 0;
-                return NULL;
-            }
-
-            alert("Not found");
-        }
-        else
         if( *tab == '\x17' ) {
             extern int cmdkey;
             extern const char *cmdarg;
@@ -832,13 +947,20 @@ char* game_browser_v2() {
             //return NULL;
         }
         else
-        if( *tab == '\x19' ) {
-            int next[] = { [0]=3,[3]=6,[6]=12,[12]=0 };
+        if( *tab == '\x18' ) {
+            const char *search = prompt("Game search", ""/*"Either \"#zxdb-id\", \"*text*search*\", or \"/file.ext\" path"*/, "");
 
-            thumbnails = next[thumbnails];
+            if( search && search[0] ) {
+                search_query_v1( search );
 
-            tab = prev;
-            prev = prev;
+                prev = tab;
+                return NULL;
+            } else {
+                tab = prev;
+                if(!tab) tab = prev = tabs + 2; // 'A'
+                return NULL;
+            }
+
             //list = 0;
             //list_num = 0;
             //return NULL;
@@ -906,6 +1028,7 @@ char* game_browser_v2() {
     if( !tab ) return NULL;
 
     if( *tab == '\x17' ) return game_browser_v1(); // NULL;
+    if( *tab == '\x18' ) return search_results_v1();
 
     ui_at(ui, 0, UPPER_SPACING+2*LINE_HEIGHT);
 
@@ -964,6 +1087,13 @@ char* game_browser_v2() {
         if( title[0] != *tab && alias[0] == *tab ) title = alias, title_len = alias_len;
         }
 
+        // also display alias right after any matching IDs are found twice
+        // ie, gremlins 2: la nueva generacion (#2139) and gremlins 2: the new batch (#2139)
+        bool use_alt = i && atoi((char*)*list[i]) == atoi((char*)*list[i-1]);
+        if( use_alt ) {
+            title = alias; title_len = alias_len;
+        }
+
         // replace year if title was never released
         if( years[0] == '9' ) years = "?", years_len = 1; // "9999"
 
@@ -991,7 +1121,7 @@ char* game_browser_v2() {
         extern zxdb ZXDB;
         int loaded = ZXDB.ids[0] && atoi(ZXDB.ids[0]) == atoi(zx_id);
         if( loaded ) selection[0] = ui_x, selection[1] = ui_y;
-        colors[0] = loaded ? '\5' : '\7';
+        colors[0] = loaded && ZXFlashFlag ? '\5' : '\7';
 
         int dbid = atoi(zx_id);
         int vars = cache_get(dbid);
@@ -1009,12 +1139,12 @@ char* game_browser_v2() {
 
         int clicked = 0, flagged = 0, starred = 0;
         int iterated = selected == i;
-        int filtered = 0;
+        int dimmed = 0;
 
         char wildcard[128] = {0};
         if( filter && filter[0] && snprintf(wildcard, 128, "*%s*", filter) ) {
-            ui_alpha = 128;
-            if( strmatchi(full_title, wildcard) ) ui_alpha = 255, filtered = 1;
+            dimmed = !strmatchi(full_title, wildcard);
+            ui_alpha = !thumbnails && dimmed ? 64 : 255;
         }
 
         if( !thumbnails ) {
@@ -1075,11 +1205,22 @@ char* game_browser_v2() {
                 has_thumb = 1;
             }
 
-            int mouse_hovering = m.x >= x && m.x < (x+w) && m.y >= y && m.y < (y+h);
-            if( mouse_hovering || iterated || filtered ) {
-                ui_rect(ui, x,y, x+w-1,y+h-1);
+            if( dimmed && filter && filter[0] )
+            for( int iy = y, iyend = y+h; iy < iyend; ++iy )
+            for( TPixel *ix = &ui->pix[ x + iy * _320 ], *ixend = ix+w; ix < ixend; ++ix ) {
+                ix->rgba = ( ix->rgba & 0x00f8f8f8 ) >> 3 | 0xff000000;
             }
-            if( mouse_hovering || iterated ) {
+
+            int hovered = m.x >= x && m.x < (x+w) && m.y >= y && m.y < (y+h);
+            if( hovered || iterated || loaded ) {
+                unsigned bak = ui_colors[1];
+                if( hovered  ) ui_colors[1] = RGB(255,255,255);
+                if( iterated ) ui_colors[1] = RGB(255,255,255);
+                if( loaded   ) ui_colors[1] = ZXFlashFlag ? RGB(0,255,255) : RGB(255,255,255);
+                ui_rect(ui, x,y, x+w-1,y+h-1);
+                ui_colors[1] = bak;
+            }
+            if( hovered || iterated ) {
                 ui_at(ui, x+2, y+2);
 
                 if( ui_click(NULL, va("%c\f", "\x10\x12"[!!star])) )
@@ -1088,7 +1229,7 @@ char* game_browser_v2() {
                 if( ui_click(NULL, va("%c%s", colors[flag], flag == 0 || flag == 3 ? "✓":"╳")) ) // "":""
                     flagged = 1;
 
-                if( mouse_hovering ) {
+                if( hovered ) {
                     if( m.x <= (x+10) && m.y <= (y+11) ) {
                         ui_notify("-Toggle bookmark-");
                     }

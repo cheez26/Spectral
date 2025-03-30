@@ -27,7 +27,7 @@ int window_longpress(window *app, unsigned char vk) {
     static int table[256] = {0}; // @fixme: table[num_windows][256];
     table[vk] *= !!window_pressed(app, vk);
     table[vk] += !!window_pressed(app, vk);
-    return table[vk] == 50; // 1s
+    return table[vk] == 40; // 50==1.00s, 40==0.80s
 }
 
 char*   prompt(const char *title, const char *caption, const char *defaults );

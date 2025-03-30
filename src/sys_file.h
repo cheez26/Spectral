@@ -22,13 +22,15 @@
 
 #ifdef _WIN32
 #define open8(path,mode)  _wopen(widen(path))
+#define popen8(path,mode) _wpopen(widen(path),widen(mode))
 #define fopen8(path,mode) _wfopen(widen(path),widen(mode))
 #define remove8(path)     _wremove(widen(path))
 #define rename8(path)     _wrename(widen(path))
 #define stat8(path,st)    _wstat(widen(path),st) // _stati64()
 #define stat8_t           _stat                  // struct _stati64
 #else
-#define open8(path,mode)  open(path, mode)
+#define open8(path,mode)  open(path,mode)
+#define popen8(path,mode) popen(path,mode)
 #define fopen8(path,mode) fopen(path,mode)
 #define remove8(path)     remove(path)
 #define rename8(path)     rename(path)

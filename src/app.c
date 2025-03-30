@@ -1,3 +1,14 @@
+// @fixme:
+// speed:
+// exolon autofps
+// ui:
+// ui_print() dims not very accurate when ui_monospaced==0. see chasehq2 instructions boundings
+// overlay:
+// setting: fit-to-screen (maps) vs 1:1 (instructions) @todo
+// wrong aspect ratio: see chasehq2 instructions
+// zxdb:
+// afterburner: help, cheats, bonus
+
 // # build (windows)
 // cl app.c /FeSpectral.exe /O2 /MT /DNDEBUG=3 /GL /GF /arch:AVX
 //
@@ -15,7 +26,7 @@
 // glue sequential tzx/taps in zips (side A) -> side 1 etc)
 // sequential tzx/taps/dsks do not reset model
 
-#define SPECTRAL "v1.05"
+#define SPECTRAL "v1.06-WIP"
 
 #if NDEBUG >= 2
 #define DEV 0
@@ -156,13 +167,25 @@ int screenshot(const char *filename) {
     int ok1 = writefile(va("%s %s %04x.scr", filename, stamp, count), VRAM, 6912);
     int ok2 = tigrSaveImage(va("%s %s %04x.png", filename, stamp, count), app);
 #else
-    int ok1 = writefile(va("%s-%04x.scr", filename, count), VRAM, 6912);
-    int ok2 = tigrSaveImage(va("%s-%04x.png", filename, count), app);
+    FILE *png = fopen8(va("%s-%04x.png", filename, count), "wb");
+    int ok1 = tigrSaveImageFile(png, app); if(png) fclose(png);
+    int ok2 = writefile(va("%s-%04x.scr", filename, count), VRAM, 6912);
 #endif
 
     return ok1 && ok2;
 }
 
+int save_config() {
+    mkdir(".Spectral", 0777);
+    int errors = 0;
+    if( !ZX_PLAYER ) for( FILE *fp = fopen(".Spectral/Spectral.ini", "wt"); fp; fclose(fp), fp = 0 ) {
+        #define INI_SAVE_NUM(opt) errors += fprintf(fp, "%s=%d\n", #opt, opt) != 2;
+        #define INI_SAVE_STR(opt) errors += fprintf(fp, "%s=%s\n", #opt, opt?opt:"") != 2;
+        INI_OPTIONS_NUM(INI_SAVE_NUM)
+        INI_OPTIONS_STR(INI_SAVE_STR)
+    }
+    return !errors;
+}
 int load_config() {
     int errors = 0;
     if( !ZX_PLAYER ) for( FILE *fp = fopen(".Spectral/Spectral.ini", "rt"); fp; fclose(fp), fp = 0 ) {
@@ -177,21 +200,34 @@ int load_config() {
         #define INI_LOAD_STR(opt) if( strcmpi(key, #opt) == 0 ) opt = STRDUP(val); else 
         INI_OPTIONS_STR(INI_LOAD_STR) {}
         }
-    }
-    return !errors;
-}
-int save_config() {
-    mkdir(".Spectral", 0777);
-    int errors = 0;
-    if( !ZX_PLAYER ) for( FILE *fp = fopen(".Spectral/Spectral.ini", "wt"); fp; fclose(fp), fp = 0 ) {
-        #define INI_SAVE_NUM(opt) errors += fprintf(fp, "%s=%d\n", #opt, opt) != 2;
-        #define INI_SAVE_STR(opt) errors += fprintf(fp, "%s=%s\n", #opt, opt?opt:"") != 2;
-        INI_OPTIONS_NUM(INI_SAVE_NUM)
-        INI_OPTIONS_STR(INI_SAVE_STR)
+        extern int cmdkey;
+        extern const char* cmdarg;
+        if(ZX_FOLDER && ZX_FOLDER[0] > 32) cmdkey = 'SCAN', cmdarg = ZX_FOLDER;
     }
     return !errors;
 }
 
+
+bool load_overlay(const void *data, int len) {
+    extern window *overlay;
+
+    unsigned w, h;
+    if( ui_image_info(data,len,&w,&h) ) {
+        rgba *bitmap = ui_image(data,len,w,h,0);
+        if( bitmap ) {
+            if(overlay) tigrFree(overlay);
+            overlay = window_bitmap(w,h);
+            memcpy(overlay->pix, bitmap, w * h * 4);
+            free( bitmap );
+
+            tigrRenderInitMap();
+
+            return true;
+        }
+    }
+
+    return false;
+}
 
 
 
@@ -424,8 +460,6 @@ void input() {
 
 
 
-
-
 enum { OVERLAY_ALPHA = 96 };
 window *app, *ui, *dbg, *overlay, *dialog, *irc; 
 int do_overlay, do_disasm, do_irc = 0;
@@ -531,30 +565,40 @@ void draw_ui() {
         };
 
         // zxdb
-        if( ui_click(va("- %s -", ZXDB.ids[0]), "ZXDB\n"));
+        if( ui_click(va("- %s -", ZXDB.ids[0]), "ZXDB"));
+        {
+        char *link = va("- Visit game page -\nhttps://spectrumcomputing.co.uk/entry/%s", ZXDB.ids[0]);
+        if( ui_click(link, "\f\f\x19\n")) visit(link + countof("- Visit game page-\n"));
+        }
         if( ui_click(va("- %s -", ZXDB.ids[2]), "Title\n"));
+        if( ZXDB.ids[3][0] )
+        if( ui_click(va("- %s -", ZXDB.ids[3]), "Alias\n"));
         if( ui_click(va("- %s -", ZXDB.ids[1]), "Year\n"));
         if( ui_click(va("- %s -", ZXDB.ids[4]), "Brand\n"));
 
+        if( ui_click(va("- %s -", ZXDB.ids[7] + strspn(ZXDB.ids[7],"0123456789")), "Genre\n"));
+        if( ZXDB.ids[6][0] && ui_click(va("- %s -", ZXDB.ids[6]), "Score\n"));
+
         if( ZXDB.authors[0] ) {
             if( ZXDB.authors[1] ) {
-                if( ui_click("-List developers-", "Authors\n")) {
-                    ui_dialog_new("-Authors-");
-                    for( int i = 0; i < 9/*countof(ZXDB.authors)*/; ++i )
+                char text[(1+9)*64] = {0}, *ptr = text;
+                for( int i = 0; i < 9/*countof(ZXDB.authors)*/; ++i ) {
+                    if( i == 0 )
+                        ptr += snprintf(ptr, 64, "- Credits -\n");
                     if( ZXDB.authors[i] )
-                        ui_dialog_option(0, va("%s%s\n",roles[ZXDB.authors[i][0]],ZXDB.authors[i]+1),NULL, 0,NULL);
-                    ui_dialog_separator();
-                    ui_dialog_ok();
+                        ptr += snprintf(ptr, 64, "%s%s\n",roles[ZXDB.authors[i][0]],ZXDB.authors[i]+1);
                 }
+                if( ui_click(text, "Team\n"));
             } else {
                 int i = 0;
-                if( ui_click(va("- %s%s -", roles[ZXDB.authors[i][0]], ZXDB.authors[i]+1), "Author\n"));
+                if( ui_click(va("- %s%s -",roles[ZXDB.authors[i][0]],ZXDB.authors[i]+1), "Author\n"));
             }
         }
 
-        if( ui_click(va("- %s -", ZXDB.ids[7] + strspn(ZXDB.ids[7],"0123456789")), "Genre\n"));
-        if( ZXDB.ids[6][0] && ui_click(va("- %s -", ZXDB.ids[6]), "Score\n"));
-        if( ui_click("- Visit game page -", "Page\n")) visit(va("https://spectrumcomputing.co.uk/entry/%s", ZXDB.ids[0]));
+        if( ZXDB.ids[8] )
+        if( ui_click(ZXDB.ids[8], "Tags\n"));
+//          if( ui_click("- AY Sound -", "Feat.\n"));
+//          if( ui_click("- Multicolour (Rainbow Graphics) -", "Feat.\n"));
 
         if( ui_click(va("- %s -", strchr(ZXDB.ids[5], ',')+1), "Model\n"));
         if( ui_click("- Change media -", "Media\n")) cmdkey = 'LIST', cmdarg = va("#%s", ZXDB.ids[0]);
@@ -564,11 +608,7 @@ void draw_ui() {
                 do_overlay ^= 1;
                 tigrClear(overlay, !do_overlay ? tigrRGBA(0,0,0,0) : tigrRGBA(0,0,0,OVERLAY_ALPHA));
                 if( do_overlay ) {
-                    rgba *bitmap = ui_image(data,len, _320,_240, 0);
-                    if( bitmap ) {
-                        memcpy(overlay->pix, bitmap, _320 * _240 * 4);
-                        free( bitmap );
-                    }
+                    load_overlay(data,len);
                 }
             }
         }
@@ -600,38 +640,39 @@ void draw_ui() {
                 tigrClear(overlay, !do_overlay ? tigrRGBA(0,0,0,0) : tigrRGBA(0,0,0,OVERLAY_ALPHA));
                 do_overlay ^= 1;
                 if( do_overlay ) {
-                    rgba *bitmap = ui_image(data,len, _320,_240, 0);
-                    if( bitmap ) {
-                        memcpy(overlay->pix, bitmap, _320 * _240 * 4);
-                        free( bitmap );
-                    }
+                    load_overlay(data, len);
                 }
             }
         }
-        if( zxdb_url(ZXDB, "poke") && ui_click("- Cheats -", "Cheats\n") ) { // @todo: selector
+        if( zxdb_url(ZXDB, "poke") && ui_click("- Enable Cheats -", "Cheats\n") ) { // @todo: selector
             for( char *data = zxdb_download(ZXDB,zxdb_url(ZXDB, "poke"), &len); data; free(data), data = 0 ) {
                 loadbin(data, len, false);
             }
         }
-
-        if( ZXDB.ids[8] )
-        if( ui_click(ZXDB.ids[8], "Tags\n"));
-//          if( ui_click("- AY Sound -", "Feat.\n"));
-//          if( ui_click("- Multicolour (Rainbow Graphics) -", "Feat.\n"));
-
-        }
-
         if( zxdb_url(ZXDB, "instructions") && ui_click("- Toggle Instructions -", "Help\n")) { // @todo: word wrap. mouse panning. rmb close
             for( char *data = zxdb_download(ZXDB,zxdb_url(ZXDB, "instructions"), &len); data; free(data), data = 0 ) {
                 do_overlay ^= 1;
                 tigrClear(ui, !do_overlay ? tigrRGBA(0,0,0,0) : tigrRGBA(0,0,0,OVERLAY_ALPHA));
-                if( do_overlay ) ui_monospaced = 0, ui_print(overlay, 4,4, ui_colors, as_utf8(replace(data, "\t", " ")));
+                if( do_overlay ) {
+                    const char *text = as_utf8(replace(data, "\t", " "));
+
+                    int dims = (ui_monospaced = 1, ui_print(NULL, 4,4, ui_colors, text));
+                    int w = dims & 0xFFFF;
+                    int h = dims >> 16;
+                    w = w < _320 ? _320 : w + 16-(w%16);
+                    h = h < _240 ? _240 : h + 16-(h%16);
+
+                    tigrFree(overlay);
+                    overlay = window_bitmap(w, h);
+
+                    (ui_monospaced = 1, ui_print(overlay, 4,4, ui_colors, text));
+                }
             }
         }
 
         // mags reviews
         // netplay lobby
-        // #tags
+        }
     }
 
     int shift = window_pressed(app, TK_SHIFT);
@@ -718,7 +759,7 @@ void draw_ui() {
             ui_dialog_option(1,( ZX_TURBOROM)+"\5Compatible ROM loader\n",NULL,'TURB',"0");
         }
 
-        if( ui_click(rmb_held*21+"- Toggle TV mode -\0- Toggle TV mode -\n0:off, 1:rf, 2:crt, 3:crt+rf", "▒\f%d", (ZX_CRT << 1 | ZX_RF)) ) if(rmb_up) cmdkey = 'TV'; else
+        if( ui_click(rmb_held*19+"- Toggle TV mode -\0- Toggle TV mode -\n0:off, 1:rf, 2:crt, 3:crt+rf", "▒\f%d", (ZX_CRT << 1 | ZX_RF)) ) if(rmb_up) cmdkey = 'TV'; else
         {
             int mode = (ZX_CRT << 1 | ZX_RF);
             ui_dialog_new("- Toggle TV mode -");
@@ -815,7 +856,7 @@ void draw_ui() {
             ui_dialog_option(1,( ZX_FASTTAPE)+"\5Normal tape speed\n",NULL,'FAST',"0");
         }
         ui_x += 8;
-        if( ui_click(rmb_held*25+"- Translate game menu -\0- Translate game menu -\n0:off, 1:poke game menu into English", "T\f%d\n", ZX_AUTOLOCALE)) if(rmb_up) cmdkey = 'TENG'; else
+        if( ui_click(rmb_held*24+"- Translate game menu -\0- Translate game menu -\n0:off, 1:poke game menu into English", "T\f%d\n", ZX_AUTOLOCALE)) if(rmb_up) cmdkey = 'TENG'; else
         {
             ui_dialog_new("- Translate game menu -");
             ui_dialog_option(1,1/*(!ZX_AUTOLOCALE)*/+"\5Poke translation\n","Poke game menu into English",'TENG',"1");
@@ -1542,7 +1583,7 @@ if( do_runahead == 0 ) {
 
             break; case 'SCAN':  for( const char *f = cmdarg_ && cmdarg_[0] ? cmdarg_ : app_selectfolder("Select games folder"); f ; f = 0 ) {
                                     ZX_FOLDER && REALLOC((void*)ZX_FOLDER, 0);
-                                    rescan( ZX_FOLDER = STRDUP(f) ), active = !!numgames, ui_dialog_new(NULL);
+                                    rescan( ZX_FOLDER = STRDUP(f) ), /*active = !!numgames,*/ ui_dialog_new(NULL);
                                 }
 
             break; case 'DEVT': ZX_DEVTOOLS ^= 1;
@@ -1820,16 +1861,11 @@ int gui(const char *status) {
     tigrBlitAlpha(app, ui, 0,0, 0,0, _320,_240, 1.0f);
 
     // draw overlay on top
-    if( do_overlay ) {
-        static int x0 = 0, y0 = 0; static int x = 0, y = 0;
-        static struct mouse prev = {0};
-        struct mouse now = mouse();
-        if( now.lb && !prev.lb ) x0 = now.x, y0 = now.y;
-        if( now.lb ) x = (now.x - x0), y = (now.y - y0);
-        else x *= 0.95, y *= 0.95;
-        prev = now;
-
-        tigrBlitAlpha(app, overlay, x,y, 0,0, _320,_240, 1.0f);
+    if( 1 ) {
+        if( do_overlay ) {
+            struct mouse m = mouse();
+            tigrRenderMap(app, overlay, m.x, m.y, m.buttons, m.wheel);
+        }
     }
 
     if( do_irc ) {
